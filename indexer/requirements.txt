@@ -1,0 +1,12 @@
+docling>=2.70.0
+llama-index==0.10.25
+llama-index-vector-stores-postgres==0.1.10
+psycopg2-binary==2.9.9
+sqlalchemy==2.0.25
+pydantic==2.6.0
+pydantic-settings==2.1.0
+requests==2.31.0
+python-dotenv==1.0.0
+tiktoken==0.6.0
+numpy==1.26.3
+tqdm==4.66.1

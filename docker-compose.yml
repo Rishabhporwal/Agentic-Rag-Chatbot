@@ -1,0 +1,140 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: agentic-rag-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-agentic_rag}
+      POSTGRES_USER: ${POSTGRES_USER:-rag_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init_db.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432"
+    networks:
+      - rag-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-rag_user} -d ${POSTGRES_DB:-agentic_rag}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: agentic-rag-ollama
+    volumes:
+      - ollama_data:/root/.ollama
+    ports:
+      - "11434:11434"
+    networks:
+      - rag-network
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  phoenix:
+    image: arizephoenix/phoenix:latest
+    container_name: agentic-rag-phoenix
+    ports:
+      - "6006:6006"
+      - "4317:4317"
+    environment:
+      PHOENIX_SQL_DATABASE_URL: postgresql://${POSTGRES_USER:-rag_user}:${POSTGRES_PASSWORD}@postgres:5432/phoenix
+    networks:
+      - rag-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: agentic-rag-backend
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-rag_user}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-agentic_rag}
+      OLLAMA_BASE_URL: http://ollama:11434
+      PHOENIX_COLLECTOR_ENDPOINT: http://phoenix:6006
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-nomic-embed-text}
+      LLM_MODEL: ${LLM_MODEL:-llama3.1:8b-instruct-q4_K_M}
+      RERANKER_MODEL: ${RERANKER_MODEL:-qllama/bge-reranker-v2-m3}
+      ENVIRONMENT: ${ENVIRONMENT:-production}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    ports:
+      - "8000:8000"
+    networks:
+      - rag-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      ollama:
+        condition: service_started
+      phoenix:
+        condition: service_started
+    volumes:
+      - ./backend:/app
+      - ./data/logs:/app/logs
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --workers 1
+    restart: unless-stopped
+
+  openwebui:
+    image: ghcr.io/open-webui/open-webui:main
+    container_name: agentic-rag-openwebui
+    ports:
+      - "3000:8080"
+    environment:
+      OPENAI_API_BASE_URL: http://backend:8000/v1
+      OPENAI_API_KEY: ${OPENWEBUI_API_KEY:-sk-dummy-key-for-agentic-rag}
+      WEBUI_AUTH: ${WEBUI_AUTH:-True}
+      WEBUI_NAME: "Agentic RAG"
+    volumes:
+      - openwebui_data:/app/backend/data
+    networks:
+      - rag-network
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  indexer:
+    build:
+      context: ./indexer
+      dockerfile: Dockerfile
+    container_name: agentic-rag-indexer
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-rag_user}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-agentic_rag}
+      OLLAMA_BASE_URL: http://ollama:11434
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-nomic-embed-text}
+      CHUNK_SIZE: ${CHUNK_SIZE:-512}
+      CHUNK_OVERLAP: ${CHUNK_OVERLAP:-50}
+      BATCH_SIZE: ${BATCH_SIZE:-50}
+    volumes:
+      - ./data/documents:/data/documents
+      - ./indexer:/app
+    networks:
+      - rag-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      ollama:
+        condition: service_started
+    profiles:
+      - tools
+
+networks:
+  rag-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local
+  ollama_data:
+    driver: local
+  openwebui_data:
+    driver: local

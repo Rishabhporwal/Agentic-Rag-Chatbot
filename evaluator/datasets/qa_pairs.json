@@ -1,0 +1,14 @@
+[
+  {
+    "question": "What is retrieval-augmented generation?",
+    "ground_truth": "Retrieval-augmented generation (RAG) is an AI technique that combines information retrieval with text generation to produce more accurate and contextually relevant responses by referencing external knowledge sources."
+  },
+  {
+    "question": "How does vector search work?",
+    "ground_truth": "Vector search works by converting text into high-dimensional numerical vectors (embeddings) and then finding similar vectors using distance metrics like cosine similarity."
+  },
+  {
+    "question": "What are the benefits of using citations in RAG systems?",
+    "ground_truth": "Citations in RAG systems provide transparency, enable fact-checking, build trust with users, and allow verification of information sources."
+  }
+]

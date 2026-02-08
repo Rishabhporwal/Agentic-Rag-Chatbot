@@ -39,7 +39,7 @@ async def list_documents(
         """)
 
         result = await session.execute(query, {"limit": limit, "offset": offset})
-        rows = result.fetchall()
+        rows = result.all()
 
         documents = [
             {

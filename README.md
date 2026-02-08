@@ -429,10 +429,9 @@ This project uses open-source components. Ensure compliance with individual comp
 
 For issues and questions:
 
-1. Check the [Troubleshooting](#-troubleshooting) section
-2. Review logs: `make logs`
-3. Check service health: `make status`
-4. Consult component documentation
+1. Review logs: `make logs`
+2. Check service health: `make status`
+3. Consult component documentation
 
 ---
 
